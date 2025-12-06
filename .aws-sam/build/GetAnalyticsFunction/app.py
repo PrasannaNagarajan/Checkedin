@@ -3,6 +3,7 @@ import boto3
 import os
 import uuid
 from datetime import datetime
+from boto3.dynamodb.conditions import Key, Attr
 
 # Initialize AWS clients
 dynamodb = boto3.resource('dynamodb')
@@ -43,7 +44,7 @@ def mark_attendance(event, context):
     """
     body = json.loads(event['body'])
     session_id = body.get('sessionId')
-    student_email = body.get('email') # Coming from Cognito in Frontend
+    student_email = body.get('email').lower().strip() # Coming from Cognito in Frontend
     
     
     timestamp = datetime.utcnow().isoformat()
@@ -120,29 +121,44 @@ def get_analytics(event, context):
         return {'statusCode': 500, 'body': str(e)}
     
 def get_student_history(event, context):
-    """
-    Finds all classes a specific student has attended.
-    """
-    student_email = event['queryStringParameters']['email']
+    try:
+        # Get email safely
+        params = event.get('queryStringParameters') or {}
+        student_email = params.get('email', '').lower().strip()
 
-    # Scan for records where SK matches the student email
-    # (In a real production app, we would use a GSI, but Scan is fine here)
-    response = table.scan(
-        FilterExpression=Attr('SK').eq(f"STUDENT#{student_email}")
-    )
-    
-    history = []
-    for item in response.get('Items', []):
-        history.append({
-            'class': item.get('ClassName', 'Unknown'),
-            'date': item.get('Timestamp', '').split('T')[0]
-        })
+        if not student_email:
+            return {
+                'statusCode': 400, 
+                'headers': { "Access-Control-Allow-Origin": "*" }, 
+                'body': 'Missing email'
+            }
 
-    return {
-        'statusCode': 200,
-        'headers': { "Access-Control-Allow-Origin": "*" },
-        'body': json.dumps(history)
-    }
+        # This was crashing because 'Attr' wasn't imported
+        response = table.scan(
+            FilterExpression=Attr('SK').eq(f"STUDENT#{student_email}")
+        )
+        
+        history = []
+        for item in response.get('Items', []):
+            history.append({
+                'class': item.get('ClassName', 'Unknown'),
+                'date': item.get('Timestamp', '').split('T')[0]
+            })
+
+        return {
+            'statusCode': 200,
+            'headers': { "Access-Control-Allow-Origin": "*" },
+            'body': json.dumps(history)
+        }
+
+    except Exception as e:
+        print(f"ERROR: {str(e)}")
+        # --- FIX 3: ADD HEADERS HERE SO YOU SEE THE REAL ERROR NEXT TIME ---
+        return {
+            'statusCode': 500, 
+            'headers': { "Access-Control-Allow-Origin": "*" }, 
+            'body': json.dumps({"error": str(e)})
+        }
     
 # --- ADD THIS TO THE BOTTOM OF app.py ---
 
@@ -196,7 +212,7 @@ def get_course_details(event, context):
     student_stats = {} # Email -> Count
 
     for record in attendance:
-        email = record.get('Email')
+        email = record.get('Email', ' ').lower().strip()
         if email not in student_stats:
             student_stats[email] = 0
         student_stats[email] += 1
@@ -238,3 +254,65 @@ def get_course_details(event, context):
             "dailyDetails": detail_map
         })
     }
+    
+def manage_courses(event, context):
+    """
+    Handles GET (List), POST (Add), DELETE (Remove) for Courses.
+    PK: COURSE#<ClassName>
+    SK: METADATA
+    """
+    method = event['httpMethod']
+    
+    try:
+        # 1. GET: List all courses
+        if method == 'GET':
+            # Scan for all items that are Course Metadata
+            # (In a real app, use a GSI, but Scan is fine here)
+            response = table.scan(
+                FilterExpression=Attr('PK').begins_with('COURSE#') & Attr('SK').eq('METADATA')
+            )
+            courses = [item['ClassName'] for item in response.get('Items', [])]
+            return {
+                'statusCode': 200,
+                'headers': { "Access-Control-Allow-Origin": "*" },
+                'body': json.dumps(courses)
+            }
+
+        # 2. POST: Add a new course
+        elif method == 'POST':
+            body = json.loads(event['body'])
+            class_name = body.get('className')
+            
+            table.put_item(
+                Item={
+                    'PK': f"COURSE#{class_name}",
+                    'SK': "METADATA",
+                    'ClassName': class_name,
+                    'Type': 'CourseMeta'
+                }
+            )
+            return {
+                'statusCode': 200,
+                'headers': { "Access-Control-Allow-Origin": "*" },
+                'body': json.dumps({'message': 'Course added'})
+            }
+
+        # 3. DELETE: Remove a course
+        elif method == 'DELETE':
+            body = json.loads(event['body'])
+            class_name = body.get('className')
+            
+            table.delete_item(
+                Key={
+                    'PK': f"COURSE#{class_name}",
+                    'SK': "METADATA"
+                }
+            )
+            return {
+                'statusCode': 200,
+                'headers': { "Access-Control-Allow-Origin": "*" },
+                'body': json.dumps({'message': 'Course deleted'})
+            }
+
+    except Exception as e:
+        return {'statusCode': 500, 'body': str(e)}

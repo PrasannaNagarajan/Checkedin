@@ -1,0 +1,5 @@
+get the gmails consistant: prn37 = Prn37 - done
+Be able to delete classes (professor side)
+keep new classes loaded in (in professor side, the new classes added gets deleted if the page gets reloded)
+class history work for students
+if its possible to get the updated class stats and trend graph without reloading the page

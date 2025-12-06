@@ -40,6 +40,13 @@ Resources:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: ClassNotifications
+  MyEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn:
+        Ref: AttendanceNotificationTopic
+      Protocol: email
+      Endpoint: YOUR_EMAIL@pitt.edu
   CreateSessionFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -151,7 +158,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: GetCourseDetailsFunction
-      Handler: app.get_course_details
+      Handler: app.manage_courses
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
@@ -164,10 +171,11 @@ Resources:
         ApiEvent:
           Type: Api
           Properties:
-            Path: /course-details
-            Method: get
+            Path: /courses
+            Method: any
             RestApiId:
               Ref: AttendanceApi
+    ManageCoursesFunction: null
     Metadata:
       SamResourceId: GetCourseDetailsFunction
 Outputs:

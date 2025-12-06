@@ -48,6 +48,14 @@ Resources:
     Properties:
       TopicName: ClassNotifications
 
+  # --- NEW: AUTOMATIC SUBSCRIPTION REQUEST ---
+  MyEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AttendanceNotificationTopic
+      Protocol: email
+      Endpoint: "YOUR_EMAIL@pitt.edu"  # <--- Prof email here
+
   # 4. LAMBDA FUNCTION (Generate QR/Session)
   CreateSessionFunction:
     Type: AWS::Serverless::Function
@@ -159,6 +167,25 @@ Resources:
           Properties:
             Path: /course-details
             Method: get
+            RestApiId: !Ref AttendanceApi
+
+    ManageCoursesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: app.manage_courses
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AttendanceTable
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref AttendanceTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /courses
+            Method: any # Allows GET, POST, DELETE on the same URL
             RestApiId: !Ref AttendanceApi
 
 Outputs:

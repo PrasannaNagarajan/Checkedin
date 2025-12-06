@@ -8,7 +8,7 @@ var currentUser = null;
 
 // --- GLOBAL VARS FOR PROFESSOR DASHBOARD ---
 let currentCourse = null;
-let courseList = ["CS1660", "CS2060"]; // Default courses (You can add more)
+let courseList = []; // FIX: Start empty, we will load from DB now
 let courseDataCache = null; // Stores data to handle graph clicks
 
 // Check if there is a session ID in the URL (Student scanned QR)
@@ -48,7 +48,7 @@ function handleLoggedInUser(email) {
     } else if (email === PROFESSOR_EMAIL) {
         // SCENARIO B: The Professor Logged In
         document.getElementById('professor-view').classList.remove('hidden');
-        renderSidebar(); // <--- NEW: Initialize the Sidebar
+        initProfessorDashboard(); // <--- UPDATED: Load courses from DB
     } else {
         // SCENARIO C: Student logged in manually
         document.getElementById('student-view').classList.remove('hidden');
@@ -106,31 +106,104 @@ async function loadStudentHistory(email) {
     }
 }
 
-// --- NEW PROFESSOR DASHBOARD LOGIC ---
+// --- NEW PROFESSOR DASHBOARD LOGIC (DB CONNECTED) ---
 
-// 1. Manage Course List
-function addNewCourse() {
-    const name = document.getElementById('newCourseInput').value;
-    if(name && !courseList.includes(name)) {
-        courseList.push(name);
+// 1. Initialize Dashboard & Load Courses
+async function initProfessorDashboard() {
+    try {
+        const response = await fetch(`${config.apiUrl}/courses`);
+        const data = await response.json();
+        
+        // Update global list with DB data
+        courseList = data;
         renderSidebar();
-        document.getElementById('newCourseInput').value = "";
+    } catch (e) {
+        console.error("Failed to load courses", e);
     }
 }
 
+// 2. Add New Course (To DB)
+async function addNewCourse() {
+    const name = document.getElementById('newCourseInput').value.trim();
+    if(!name) return;
+
+    // Save to DB
+    await fetch(`${config.apiUrl}/courses`, {
+        method: 'POST',
+        body: JSON.stringify({ className: name })
+    });
+
+    // Add locally and refresh
+    if (!courseList.includes(name)) {
+        courseList.push(name);
+        renderSidebar();
+    }
+    document.getElementById('newCourseInput').value = "";
+}
+
+// 3. Delete Course (From DB)
+async function deleteCourse(event, className) {
+    event.stopPropagation(); // Stop click from triggering course selection
+    
+    if(!confirm(`Are you sure you want to delete ${className}?`)) return;
+
+    // Delete from DB
+    await fetch(`${config.apiUrl}/courses`, {
+        method: 'DELETE',
+        body: JSON.stringify({ className: className })
+    });
+
+    // Remove locally
+    courseList = courseList.filter(c => c !== className);
+    
+    // If we deleted the currently active course, reset the view
+    if (currentCourse === className) {
+        currentCourse = null;
+        document.getElementById('course-actions').classList.add('hidden');
+        document.getElementById('selected-course-title').innerText = "Select a Course";
+    }
+
+    renderSidebar();
+}
+
+// 4. Render Sidebar (With Delete Buttons)
 function renderSidebar() {
     const container = document.getElementById('course-list');
     container.innerHTML = "";
+    
+    if (courseList.length === 0) {
+        container.innerHTML = "<div style='padding:10px; color:#666; font-size:0.9em;'>No courses found.<br>Add one below!</div>";
+        return;
+    }
+
     courseList.forEach(course => {
         const div = document.createElement("div");
         div.className = `course-item ${currentCourse === course ? 'course-active' : ''}`;
-        div.innerText = course;
-        div.onclick = () => loadCourseData(course);
+        
+        // Layout: Name on left, Delete 'X' on right
+        div.style.display = "flex";
+        div.style.justifyContent = "space-between";
+        div.style.alignItems = "center";
+        
+        div.innerHTML = `
+            <span>${course}</span>
+            <span onclick="deleteCourse(event, '${course}')" 
+                  style="color:red; font-weight:bold; padding:0 5px; cursor:pointer;"
+                  title="Delete Class">
+                  &times;
+            </span>
+        `;
+        
+        // Click handler for selecting the course (ignores clicks on the X)
+        div.onclick = (e) => {
+            if(e.target.innerText !== "×") loadCourseData(course);
+        };
+        
         container.appendChild(div);
     });
 }
 
-// 2. Load Data for Selected Course
+// 5. Load Data for Selected Course
 async function loadCourseData(className) {
     currentCourse = className;
     renderSidebar(); // Update highlight
@@ -164,7 +237,7 @@ async function loadCourseData(className) {
     renderChart(data.graphLabels, data.graphData);
 }
 
-// 3. Render Chart with Click Handler
+// 6. Render Chart with Click Handler
 function renderChart(labels, counts) {
     const ctx = document.getElementById('courseChart').getContext('2d');
     if (window.myChart) window.myChart.destroy();
@@ -207,8 +280,7 @@ function showDayDetails(date) {
     }
 }
 
-// 4. Generate QR (Popup Modal)
-
+// 7. Generate QR (Popup Modal)
 let activeSessionId = null;
 
 async function openQrModal() {
@@ -239,8 +311,10 @@ async function openQrModal() {
 // --- AUTH FUNCTIONS (UNCHANGED) ---
 
 function signUp() {
-    var email = document.getElementById('email').value;
+    // FIX: Force Lowercase and trim
+    var email = document.getElementById('email').value.toLowerCase().trim();
     var password = document.getElementById('password').value;
+    
     var attributeList = [new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'email', Value: email })];
     userPool.signUp(email, password, attributeList, null, function(err, result) {
         if (err) { alert(err.message || JSON.stringify(err)); return; }
@@ -250,8 +324,10 @@ function signUp() {
 }
 
 function confirmUser() {
-    var email = document.getElementById('email').value;
-    var code = document.getElementById('code').value;
+    // FIX: Force Lowercase and trim
+    var email = document.getElementById('email').value.toLowerCase().trim();
+    var code = document.getElementById('code').value.trim();
+    
     var cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: email, Pool: userPool });
     cognitoUser.confirmRegistration(code, true, function(err, result) {
         if (err) { alert(err); return; }
@@ -260,8 +336,10 @@ function confirmUser() {
 }
 
 function signIn() {
-    var email = document.getElementById('email').value;
+    // FIX: Force Lowercase and trim
+    var email = document.getElementById('email').value.toLowerCase().trim();
     var password = document.getElementById('password').value;
+    
     var authDetails = new AmazonCognitoIdentity.AuthenticationDetails({ Username: email, Password: password });
     var cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: email, Pool: userPool });
 
@@ -280,12 +358,12 @@ function signOut() {
     location.href = window.location.pathname; // Reload
 }
 
+// --- DRAGGABLE MODAL LOGIC ---
+
 makeDraggable(document.getElementById("draggable-modal"));
 
 function closeModal() {
     document.getElementById('qr-modal').classList.add('hidden');
-    // Optional: Reset position to center when closed? 
-    // If you want it to stay where they left it, do nothing here.
     const modal = document.getElementById("draggable-modal");
     modal.style.top = "";
     modal.style.left = "";
@@ -295,39 +373,32 @@ function makeDraggable(elmnt) {
   var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
   
   if (document.getElementById(elmnt.id + "header")) {
-    // if present, the header is where you move the DIV from:
     document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
   } else {
-    // otherwise, move the DIV from anywhere inside the DIV:
     elmnt.onmousedown = dragMouseDown;
   }
 
   function dragMouseDown(e) {
     e = e || window.event;
     e.preventDefault();
-    // get the mouse cursor position at startup:
     pos3 = e.clientX;
     pos4 = e.clientY;
     document.onmouseup = closeDragElement;
-    // call a function whenever the cursor moves:
     document.onmousemove = elementDrag;
   }
 
   function elementDrag(e) {
     e = e || window.event;
     e.preventDefault();
-    // calculate the new cursor position:
     pos1 = pos3 - e.clientX;
     pos2 = pos4 - e.clientY;
     pos3 = e.clientX;
     pos4 = e.clientY;
-    // set the element's new position:
     elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
     elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
   }
 
   function closeDragElement() {
-    // stop moving when mouse button is released:
     document.onmouseup = null;
     document.onmousemove = null;
   }
