@@ -1,0 +1,37 @@
+name: Deploy Cloud Application
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - uses: actions/setup-python@v2
+      - uses: aws-actions/setup-sam@v1
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Deploy Backend
+      - run: sam build
+      - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --stack-name CloudCheckIn --capabilities CAPABILITY_IAM
+
+  deploy-frontend:
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Sync Frontend files to S3
+      - run: aws s3 sync ./frontend s3://YOUR_BUCKET_NAME_HERE --delete
