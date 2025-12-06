@@ -175,29 +175,31 @@ Resources:
             Method: get
             RestApiId:
               Ref: AttendanceApi
-    ManageCoursesFunction:
-      Type: AWS::Serverless::Function
-      Properties:
-        CodeUri: backend/
-        Handler: app.manage_courses
-        Policies:
-        - DynamoDBCrudPolicy:
-            TableName:
-              Ref: AttendanceTable
-        Environment:
-          Variables:
-            TABLE_NAME:
-              Ref: AttendanceTable
-        Events:
-          ApiEvent:
-            Type: Api
-            Properties:
-              Path: /courses
-              Method: any
-              RestApiId:
-                Ref: AttendanceApi
     Metadata:
       SamResourceId: GetCourseDetailsFunction
+  ManageCoursesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ManageCoursesFunction
+      Handler: app.manage_courses
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName:
+            Ref: AttendanceTable
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Ref: AttendanceTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /courses
+            Method: any
+            RestApiId:
+              Ref: AttendanceApi
+    Metadata:
+      SamResourceId: ManageCoursesFunction
 Outputs:
   ApiURL:
     Description: API Gateway endpoint URL

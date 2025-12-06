@@ -7,6 +7,6 @@ architecture = "x86_64"
 handler = "app.create_session"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["CreateSessionFunction", "MarkAttendanceFunction", "GetAnalyticsFunction", "GetStudentHistoryFunction", "GetCourseDetailsFunction"]
+functions = ["CreateSessionFunction", "MarkAttendanceFunction", "GetAnalyticsFunction", "GetStudentHistoryFunction", "GetCourseDetailsFunction", "ManageCoursesFunction"]
 
 [layer_build_definitions]
