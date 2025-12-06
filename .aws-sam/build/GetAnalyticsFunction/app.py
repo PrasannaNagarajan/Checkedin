@@ -164,96 +164,103 @@ def get_student_history(event, context):
 
 def get_course_details(event, context):
     """
-    Returns EVERYTHING for a specific course:
-    1. Trend Data (Dates vs Count)
-    2. Student Roster with Calculation (Present / Total Sessions)
-    3. Detailed list of who attended which specific session.
+    Robust Analytics: Links Students to Classes via Session ID.
+    Fixes issues where old data might be missing the 'ClassName' tag.
     """
-    target_class = event['queryStringParameters']['className']
-    
-    # 1. Scan everything (In production, use Query with GSI)
-    response = table.scan()
-    items = response.get('Items', [])
+    try:
+        # Get target class (e.g., "CS1660")
+        params = event.get('queryStringParameters') or {}
+        target_class = params.get('className', '')
+        
+        # Scan everything
+        response = table.scan()
+        items = response.get('Items', [])
 
-    # Containers
-    sessions = []      # List of all session IDs for this class
-    session_dates = {} # Map SessionID -> Date
-    attendance = []    # List of all attendance records for this class
-    
-    # 2. Filter Raw Data
-    for item in items:
-        # Is it a Session Metadata record for THIS class?
-        if item.get('SK') == 'METADATA' and item.get('ClassName') == target_class:
-            sess_id = item['PK'].replace('SESSION#', '')
-            date_str = item.get('CreatedAt', '').split('T')[0]
-            sessions.append(sess_id)
-            session_dates[sess_id] = date_str
+        # --- PASS 1: Find all Sessions that belong to this Class ---
+        valid_sessions = set()       # Set of PKs (e.g. "SESSION#abc")
+        session_dates = {}           # Map SessionID -> Date
+        
+        for item in items:
+            if item.get('SK') == 'METADATA' and item.get('ClassName') == target_class:
+                valid_sessions.add(item['PK'])
+                
+                # Format Date
+                sess_id = item['PK'].replace('SESSION#', '')
+                raw_date = item.get('CreatedAt', '')
+                short_date = raw_date.split('T')[0] if 'T' in raw_date else raw_date
+                session_dates[sess_id] = short_date
+
+        # --- PASS 2: Find Students inside those Sessions ---
+        attendance = []
+        for item in items:
+            # We check if the record's PK is in our valid_sessions list
+            # This works even if the student record is missing 'ClassName'
+            if item.get('Type') == 'Attendance' and item.get('PK') in valid_sessions:
+                attendance.append(item)
+
+        # --- PASS 3: Calculate Stats (Same as before) ---
+        
+        # Trends
+        daily_counts = {sess_id: 0 for sess_id in session_dates.keys()}
+        daily_rosters = {sess_id: [] for sess_id in session_dates.keys()}
+
+        for record in attendance:
+            sess_id = record['PK'].replace('SESSION#', '')
+            email = record.get('Email', 'Unknown')
             
-        # Is it an Attendance record for THIS class?
-        elif item.get('Type') == 'Attendance' and item.get('ClassName') == target_class:
-            attendance.append(item)
+            if sess_id in daily_counts:
+                daily_counts[sess_id] += 1
+                daily_rosters[sess_id].append(email)
 
-    # 3. Calculate Trends (Graph Data)
-    # Group attendance by SessionID
-    daily_counts = {sess_id: 0 for sess_id in sessions}
-    daily_rosters = {sess_id: [] for sess_id in sessions} # Who attended each day
+        # Ratios
+        total_sessions_count = len(valid_sessions)
+        student_stats = {} 
 
-    for record in attendance:
-        sess_id = record['PK'].replace('SESSION#', '')
-        email = record.get('Email', 'Unknown')
+        for record in attendance:
+            email = record.get('Email', '').lower().strip() # Normalize
+            if email not in student_stats:
+                student_stats[email] = 0
+            student_stats[email] += 1
         
-        if sess_id in daily_counts:
-            daily_counts[sess_id] += 1
-            daily_rosters[sess_id].append(email)
+        # Format Roster List
+        roster_data = []
+        for email, count in student_stats.items():
+            ratio = 0
+            if total_sessions_count > 0:
+                ratio = round((count / total_sessions_count) * 100, 1)
+            
+            roster_data.append({
+                "email": email,
+                "attended": count,
+                "total": total_sessions_count,
+                "ratio": ratio
+            })
 
-    # 4. Calculate Student Ratios
-    # Total Sessions for this class
-    total_sessions_count = len(sessions)
-    student_stats = {} # Email -> Count
-
-    for record in attendance:
-        email = record.get('Email', ' ').lower().strip()
-        if email not in student_stats:
-            student_stats[email] = 0
-        student_stats[email] += 1
-    
-    # Format Roster List
-    roster_data = []
-    for email, count in student_stats.items():
-        ratio = 0
-        if total_sessions_count > 0:
-            ratio = round((count / total_sessions_count) * 100, 1)
+        # Format Graph Data (Sorted by Date)
+        sorted_sessions = sorted(session_dates.keys(), key=lambda s: session_dates[s])
         
-        roster_data.append({
-            "email": email,
-            "attended": count,
-            "total": total_sessions_count,
-            "ratio": ratio
-        })
+        graph_labels = [session_dates[s] for s in sorted_sessions]
+        graph_data = [daily_counts[s] for s in sorted_sessions]
+        
+        detail_map = {}
+        for s in sorted_sessions:
+            date = session_dates[s]
+            detail_map[date] = daily_rosters[s]
 
-    # 5. Format Graph Data (Sorted by Date)
-    # Sort sessions by date so the graph goes Left -> Right correctly
-    sorted_sessions = sorted(sessions, key=lambda s: session_dates.get(s, ''))
-    
-    graph_labels = [session_dates[s] for s in sorted_sessions]
-    graph_data = [daily_counts[s] for s in sorted_sessions]
-    
-    # Map Date -> List of Students (for the "Click on Day" feature)
-    detail_map = {}
-    for s in sorted_sessions:
-        date = session_dates[s]
-        detail_map[date] = daily_rosters[s]
+        return {
+            'statusCode': 200,
+            'headers': { "Access-Control-Allow-Origin": "*" },
+            'body': json.dumps({
+                "graphLabels": graph_labels,
+                "graphData": graph_data,
+                "roster": roster_data,
+                "dailyDetails": detail_map
+            })
+        }
 
-    return {
-        'statusCode': 200,
-        'headers': { "Access-Control-Allow-Origin": "*" },
-        'body': json.dumps({
-            "graphLabels": graph_labels,
-            "graphData": graph_data,
-            "roster": roster_data,
-            "dailyDetails": detail_map
-        })
-    }
+    except Exception as e:
+        print(f"ERROR: {str(e)}")
+        return {'statusCode': 500, 'headers': { "Access-Control-Allow-Origin": "*" }, 'body': str(e)}
     
 def manage_courses(event, context):
     """
