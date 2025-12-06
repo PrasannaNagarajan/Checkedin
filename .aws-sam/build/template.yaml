@@ -158,7 +158,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: GetCourseDetailsFunction
-      Handler: app.manage_courses
+      Handler: app.get_course_details
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
@@ -171,11 +171,31 @@ Resources:
         ApiEvent:
           Type: Api
           Properties:
-            Path: /courses
-            Method: any
+            Path: /course-details
+            Method: get
             RestApiId:
               Ref: AttendanceApi
-    ManageCoursesFunction: null
+    ManageCoursesFunction:
+      Type: AWS::Serverless::Function
+      Properties:
+        CodeUri: backend/
+        Handler: app.manage_courses
+        Policies:
+        - DynamoDBCrudPolicy:
+            TableName:
+              Ref: AttendanceTable
+        Environment:
+          Variables:
+            TABLE_NAME:
+              Ref: AttendanceTable
+        Events:
+          ApiEvent:
+            Type: Api
+            Properties:
+              Path: /courses
+              Method: any
+              RestApiId:
+                Ref: AttendanceApi
     Metadata:
       SamResourceId: GetCourseDetailsFunction
 Outputs:

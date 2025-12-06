@@ -6,7 +6,7 @@ resolve_s3 = true
 s3_prefix = "CloudCheckIn"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-disable_rollback = true
+disable_rollback = false
 image_repositories = []
 
 [default.global.parameters]
