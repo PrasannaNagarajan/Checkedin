@@ -1,37 +1,50 @@
-name: Deploy Cloud Application
+name: Deploy CloudCheckIn
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main  # Or 'master', depending on your default branch name
 
 jobs:
-  deploy-infra:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      
-      - uses: actions/setup-python@v2
-      - uses: aws-actions/setup-sam@v1
-      - uses: aws-actions/configure-aws-credentials@v1
+      # 1. Check out the code
+      - uses: actions/checkout@v3
+
+      # 2. Install Python (for SAM)
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # 3. Install AWS SAM CLI
+      - uses: aws-actions/setup-sam@v2
+
+      # 4. Configure AWS Credentials
+      - uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # Deploy Backend
-      - run: sam build
-      - run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --stack-name CloudCheckIn --capabilities CAPABILITY_IAM
+      # 5. Build the Backend
+      - name: SAM Build
+        run: sam build
 
-  deploy-frontend:
-    needs: deploy-infra
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+      # 6. Deploy Backend Infrastructure
+      # We use --no-confirm-changeset because we can't click 'y' in automation
+      # We use --resolve-s3 to let SAM manage the upload bucket automatically
+      - name: SAM Deploy
+        run: |
+          sam deploy \
+            --stack-name CloudCheckIn \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --region us-east-1 \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
 
-      # Sync Frontend files to S3
-      - run: aws s3 sync ./frontend s3://YOUR_BUCKET_NAME_HERE --delete
+      # 7. Deploy Frontend to S3
+      # REPLACE 'YOUR-REAL-BUCKET-NAME' BELOW WITH YOUR ACTUAL BUCKET NAME
+      - name: Sync S3
+        run: aws s3 sync ./frontend s3://cloudcheckin-praz-frontend --delete
