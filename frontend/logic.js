@@ -8,8 +8,8 @@ var currentUser = null;
 
 // --- GLOBAL VARS FOR PROFESSOR DASHBOARD ---
 let currentCourse = null;
-let courseList = []; // FIX: Start empty, we will load from DB now
-let courseDataCache = null; // Stores data to handle graph clicks
+let courseList = [];
+let courseDataCache = null; 
 
 // Check if there is a session ID in the URL (Student scanned QR)
 const urlParams = new URLSearchParams(window.location.search);

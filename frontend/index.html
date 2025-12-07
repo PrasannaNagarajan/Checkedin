@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>CloudCheckIn</title>
+    <title>CheckedIn</title>
     <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.7/dist/amazon-cognito-identity.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -177,14 +177,14 @@
 
 <body>
     <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>CloudCheckIn</h1>
+        <h1>CheckedIn</h1>
         <button id="logoutBtn" class="hidden" onclick="signOut()" style="background: #dc3545;">Logout</button>
     </div>
 
     <div id="auth-section" class="card">
         <h3>Welcome</h3>
         <p id="auth-message">Please log in to continue.</p>
-        <input type="text" id="email" placeholder="Student/Prof Email (.edu)" style="width: 60%;">
+        <input type="text" id="email" placeholder="Student/Prof Email" style="width: 60%;">
         <input type="password" id="password" placeholder="Password" style="width: 60%;">
         <br><br>
         <button onclick="signIn()">Sign In</button>
