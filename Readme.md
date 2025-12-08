@@ -2,6 +2,8 @@
 
 CheckedIn is a modern, cloud-native application designed to revolutionize university attendance tracking. Built on a fully serverless architecture in AWS, the system replaces paper sign-in sheets and roll calls with dynamic QR codes, real-time logging, and automated analytics.
 
+Repository link: https://github.com/PrasannaNagarajan/Checkedin
+
 ## ❓ Problem & Solution
 
 ### The Problem
