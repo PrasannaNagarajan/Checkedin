@@ -1,6 +1,6 @@
-# CloudCheckIn: Serverless QR Attendance System
+# CheckedIn: Serverless QR Attendance System
 
-CloudCheckIn is a modern, cloud-native application designed to revolutionize university attendance tracking. Built on a fully serverless architecture in AWS, the system replaces paper sign-in sheets and roll calls with dynamic QR codes, real-time logging, and automated analytics.
+CheckedIn is a modern, cloud-native application designed to revolutionize university attendance tracking. Built on a fully serverless architecture in AWS, the system replaces paper sign-in sheets and roll calls with dynamic QR codes, real-time logging, and automated analytics.
 
 ## ❓ Problem & Solution
 
@@ -15,7 +15,7 @@ Traditional attendance methods are inefficient:
 
 ### The Solution
 
-CloudCheckIn delivers a seamless digital workflow:
+CheckedIn delivers a seamless digital workflow:
 
 1. **Professors generate** a unique QR code for each class session
 2. **Students scan** the QR code with their phones to instantly check in
@@ -69,7 +69,7 @@ This email receives automatic attendance alerts.
 
 ## 🏗️ Architecture Diagram
 
-CloudCheckIn uses a scalable, event-driven, serverless microservices architecture:
+CheckedIn uses a scalable, event-driven, serverless microservices architecture:
 
 ```mermaid
 graph TD
@@ -180,9 +180,9 @@ Chosen because:
 1. **Log In** using the professor email configured in logic.js
 2. **Add Course** → saved instantly in DynamoDB
 3. **Generate QR Code** for today's session
-4. **Project QR Code** to students
-5. **Analyze Attendance Trends** with interactive graphs
-6. **Click a Data Point** to see the full student roster for that date
+4. **Project QR Code** to students (Every page refresh counts as a new class)
+6. **Analyze Attendance Trends** with interactive graphs
+7. **Click a Data Point** to see the full student roster for that date
 
 ### 🧑‍🎓 Student Workflow
 
@@ -217,7 +217,7 @@ These allow GitHub Actions to deploy your app to AWS.
 ## 📂 Repository Structure
 
 ```
-cloudcheckin/
+CheckedIn/
 │
 ├── frontend/
 │   ├── logic.js
